@@ -1,14 +1,3 @@
 [build]
-builder = "nixpacks"
-
-[build.nixpacksPlan.phases.setup]
-nixPkgs = ["nodejs_20", "python311"]
-
-[build.nixpacksPlan.phases.install]
-cmds = [
-  "pip install -r requirements.txt",
-  "./build.sh"
-]
-
-[deploy]
-startCommand = "python -m uvicorn backend.main:app --host 0.0.0.0 --port $PORT"
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
