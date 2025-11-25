@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
 import { api } from './api';
+import * as storage from './localStorage';
 import './App.css';
 
 function App() {
@@ -22,29 +23,30 @@ function App() {
     }
   }, [currentConversationId]);
 
-  const loadConversations = async () => {
+  const loadConversations = () => {
     try {
-      const convs = await api.listConversations();
+      const convs = storage.listConversationsMetadata();
       setConversations(convs);
     } catch (error) {
       console.error('Failed to load conversations:', error);
     }
   };
 
-  const loadConversation = async (id) => {
+  const loadConversation = (id) => {
     try {
-      const conv = await api.getConversation(id);
+      const conv = storage.getConversation(id);
       setCurrentConversation(conv);
     } catch (error) {
       console.error('Failed to load conversation:', error);
     }
   };
 
-  const handleNewConversation = async () => {
+  const handleNewConversation = () => {
     try {
-      const newConv = await api.createConversation();
+      const id = crypto.randomUUID();
+      const newConv = storage.createConversation(id);
       setConversations([
-        { id: newConv.id, created_at: newConv.created_at, message_count: 0 },
+        { id: newConv.id, created_at: newConv.created_at, title: newConv.title, message_count: 0 },
         ...conversations,
       ]);
       setCurrentConversationId(newConv.id);
@@ -62,6 +64,9 @@ function App() {
 
     setIsLoading(true);
     try {
+      // Add user message to localStorage
+      storage.addUserMessage(currentConversationId, content);
+
       // Optimistically add user message to UI
       const userMessage = { role: 'user', content };
       setCurrentConversation((prev) => ({
@@ -89,6 +94,11 @@ function App() {
         messages: [...prev.messages, assistantMessage],
       }));
 
+      // Track stages for localStorage save
+      let stage1Data = null;
+      let stage2Data = null;
+      let stage3Data = null;
+
       // Send message with streaming
       await api.sendMessageStream(currentConversationId, content, (eventType, event) => {
         switch (eventType) {
@@ -102,6 +112,7 @@ function App() {
             break;
 
           case 'stage1_complete':
+            stage1Data = event.data;
             setCurrentConversation((prev) => {
               const messages = [...prev.messages];
               const lastMsg = messages[messages.length - 1];
@@ -121,6 +132,7 @@ function App() {
             break;
 
           case 'stage2_complete':
+            stage2Data = event.data;
             setCurrentConversation((prev) => {
               const messages = [...prev.messages];
               const lastMsg = messages[messages.length - 1];
@@ -141,6 +153,7 @@ function App() {
             break;
 
           case 'stage3_complete':
+            stage3Data = event.data;
             setCurrentConversation((prev) => {
               const messages = [...prev.messages];
               const lastMsg = messages[messages.length - 1];
@@ -151,12 +164,18 @@ function App() {
             break;
 
           case 'title_complete':
+            // Update title in localStorage
+            storage.updateConversationTitle(currentConversationId, event.data.title);
             // Reload conversations to get updated title
             loadConversations();
             break;
 
           case 'complete':
-            // Stream complete, reload conversations list
+            // Save assistant message to localStorage
+            if (stage1Data && stage2Data && stage3Data) {
+              storage.addAssistantMessage(currentConversationId, stage1Data, stage2Data, stage3Data);
+            }
+            // Reload conversations list
             loadConversations();
             setIsLoading(false);
             break;
