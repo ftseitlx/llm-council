@@ -8,4 +8,4 @@ nixPkgs = ["nodejs_20", "python311"]
 cmds = ["./build.sh"]
 
 [deploy]
-startCommand = ".venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port $PORT"
+startCommand = "python -m uvicorn backend.main:app --host 0.0.0.0 --port $PORT"
