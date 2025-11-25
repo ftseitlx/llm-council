@@ -192,16 +192,21 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
 
 
 # Mount static files for frontend
-frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
-print(f"Looking for frontend dist at: {frontend_dist}")
-print(f"Frontend dist exists: {frontend_dist.exists()}")
-if frontend_dist.exists():
-    print(f"Mounting static files from: {frontend_dist}")
+# Try multiple possible locations
+possible_paths = [
+    Path(__file__).parent.parent / "frontend" / "dist",
+    Path.cwd() / "frontend" / "dist",
+    Path("/app/frontend/dist"),  # Railway might use /app
+]
+
+frontend_dist = None
+for path in possible_paths:
+    if path.exists():
+        frontend_dist = path
+        break
+
+if frontend_dist:
     app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="static")
-else:
-    print(f"WARNING: Frontend dist folder not found at {frontend_dist}")
-    print(f"Current working directory: {Path.cwd()}")
-    print(f"__file__ location: {Path(__file__).absolute()}")
 
 
 if __name__ == "__main__":
